@@ -10,6 +10,7 @@ import cv2
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
 
 from models.base_model import BaseModel
 from models.logistic_regression import LogisticRegressionModel
@@ -88,6 +89,32 @@ def create_model(model_name: str):
         )
     return model
 
+def save_confusion_matrix(tp, fp, tn, fn, filename="confusion_matrix.png"):
+    confusion_matrix = np.array([[tp, fn], [fp, tn]])
+    
+
+    fig, ax = plt.subplots()
+    cax = ax.matshow(confusion_matrix, cmap="Blues")
+
+    plt.colorbar(cax)
+
+
+    ax.set_xlabel('Predicted')
+    ax.set_ylabel('Actual')
+
+
+    ax.set_xticks([0, 1])
+    ax.set_yticks([0, 1])
+    ax.set_xticklabels(['Positive', 'Negative'])
+    ax.set_yticklabels(['Positive', 'Negative'])
+
+    for (i, j), val in np.ndenumerate(confusion_matrix):
+        ax.text(j, i, f'{val}', ha='center', va='center', color='black', fontsize=12)
+
+    plt.tight_layout()
+    plt.savefig(filename, format="png", dpi=300)
+    plt.close()
+
 def perform_training_and_evaluation(
     model: BaseModel,
     validation_strategy: str,
@@ -125,9 +152,8 @@ def perform_training_and_evaluation(
             scores[model_name][validation_strategy][metric_name] = metric_value
         y_pred = model.predict(X_test)
 
-        # TODO save this in a more convenient format
         tn, fp, fn, tp = map(int, confusion_matrix(y_test, y_pred).ravel())
-        print(type(tn))
+        save_confusion_matrix(tp=tp, fp=fp, tn=tn, fn=fn, filename=f"plots/part2/{model_name}/simple_split/confusion_matrix.png")
         scores[model_name][validation_strategy]["confusion_matrix"] = {"tn": tn, "fp": fp, "fn": fn, "tp": tp}
     elif validation_strategy == "k_fold":
         pass
@@ -137,7 +163,7 @@ def perform_training_and_evaluation(
         raise ValueError(
             f"Validation strategy {validation_strategy} not recognised, use one of [simple_split, k_fold, stratified_k_fold]"
         )
-    print(scores)
+
     with open(scores_path, "w") as f:
         json.dump(scores, f)
 
