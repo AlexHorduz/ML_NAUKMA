@@ -94,16 +94,12 @@ def create_model(model_name: str):
 def save_confusion_matrix(tp, fp, tn, fn, filename="confusion_matrix.png"):
     confusion_matrix = np.array([[tp, fn], [fp, tn]])
     
-
     fig, ax = plt.subplots()
     cax = ax.matshow(confusion_matrix, cmap="Blues")
-
     plt.colorbar(cax)
-
 
     ax.set_xlabel('Predicted')
     ax.set_ylabel('Actual')
-
 
     ax.set_xticks([0, 1])
     ax.set_yticks([0, 1])
@@ -145,28 +141,60 @@ def perform_training_and_evaluation(
         X_train, X_val, y_train, y_val = validation_split(X_train, y_train, test_size=0.2, seed=RANDOM_SEED)
 
         model.train(X_train, y_train, X_val, y_val)
-        model.visualize_training(f"plots/part2/{model_name}/simple_split")
+        model.visualize_training(f"plots/part2/{model_name}/{validation_strategy}")
 
         for metric_name, (metric_func, predict_type) in model.metrics.items():
             y_pred = getattr(model, predict_type)(X_test)
             metric_value = metric_func(y_test, y_pred)
             scores[model_name][validation_strategy][metric_name] = metric_value
-        y_pred = model.predict(X_test)
-
-        tn, fp, fn, tp = map(int, confusion_matrix(y_test, y_pred).ravel())
-        save_confusion_matrix(tp=tp, fp=fp, tn=tn, fn=fn, filename=f"plots/part2/{model_name}/simple_split/confusion_matrix.png")
-        scores[model_name][validation_strategy]["confusion_matrix"] = {"tn": tn, "fp": fp, "fn": fn, "tp": tp}
-    elif validation_strategy == "k_fold":
-        splitter = KFold(n_splits=4, random_state=RANDOM_SEED, shuffle=True)
         
-        for i, (train_index, val_index) in enumerate(splitter.split(X_train)):
+        y_pred = model.predict(X_test)
+        tn, fp, fn, tp = map(int, confusion_matrix(y_test, y_pred).ravel())
+
+        save_confusion_matrix(tp=tp, fp=fp, tn=tn, fn=fn, filename=f"plots/part2/{model_name}/{validation_strategy}/confusion_matrix.png")
+        scores[model_name][validation_strategy]["confusion_matrix"] = {"tn": tn, "fp": fp, "fn": fn, "tp": tp}
+    elif validation_strategy in ["k_fold", "stratified_k_fold"]:
+        if validation_strategy == "k_fold":
+            splitter = KFold(n_splits=5, random_state=RANDOM_SEED, shuffle=True)
+        else:
+            splitter = StratifiedKFold(n_splits=5, random_state=RANDOM_SEED, shuffle=True)
+        models = []
+        for fold, (train_index, val_index) in enumerate(splitter.split(X_train, y_train)):
+            model = create_model(model_name)
             X_train_fold = X_train[train_index, :]
             y_train_fold = y_train[train_index, :]
 
             X_val_fold = X_train[val_index, :]
             y_val_fold = y_train[val_index, :]
-    elif validation_strategy == "stratified_k_fold":
-        pass
+
+            model.train(X_train_fold, y_train_fold, X_val_fold, y_val_fold)
+            model.visualize_training(f"plots/part2/{model_name}/{validation_strategy}/fold_{fold}")
+            
+            models.append(model)
+
+        for metric_name, (metric_func, predict_type) in model.metrics.items():
+            all_preds = []
+            for model in models:
+                y_pred = getattr(model, predict_type)(X_test)
+                all_preds.append(y_pred)
+            all_preds = np.array(all_preds).mean(axis=0)
+            if predict_type == "predict":
+                all_preds = all_preds.round().astype(int)
+
+            metric_value = metric_func(y_test, all_preds)
+            scores[model_name][validation_strategy][metric_name] = metric_value
+
+        all_preds = []
+        for model in models:
+            y_pred = model.predict(X_test)
+            all_preds.append(y_pred)
+        all_preds = np.array(all_preds).mean(axis=0)
+        all_preds = all_preds.round().astype(int)
+
+        tn, fp, fn, tp = map(int, confusion_matrix(y_test, all_preds).ravel())
+
+        save_confusion_matrix(tp=tp, fp=fp, tn=tn, fn=fn, filename=f"plots/part2/{model_name}/{validation_strategy}/confusion_matrix.png")
+        scores[model_name][validation_strategy]["confusion_matrix"] = {"tn": tn, "fp": fp, "fn": fn, "tp": tp}
     else:
         raise ValueError(
             f"Validation strategy {validation_strategy} not recognised, use one of [simple_split, k_fold, stratified_k_fold]"
@@ -175,10 +203,7 @@ def perform_training_and_evaluation(
     with open(scores_path, "w") as f:
         json.dump(scores, f)
 
-
-
-        
-
+    # TODO examine all wrongly predicted images
 
 
 
@@ -201,7 +226,7 @@ def main(image_folder: str, label_file: str, model_name: str, test_size: float):
     # split data into train and test
     X_train, X_test, y_train, y_test = validation_split(X, y, test_size)
 
-    for validation_strategy in ["simple_split"]:
+    for validation_strategy in ["simple_split", "k_fold", "stratified_k_fold"]:
         perform_training_and_evaluation(
             model_name=model_name,
             validation_strategy=validation_strategy,
