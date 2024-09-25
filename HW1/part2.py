@@ -9,7 +9,7 @@ import pandas as pd
 import cv2
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
 import matplotlib.pyplot as plt
 
 from models.base_model import BaseModel
@@ -19,6 +19,8 @@ LABELS_MAPPING = {
     "human": 0,
     "animal": 1
 }
+
+RANDOM_SEED = 42
 
 def load_data(image_folder: str, label_file: str) -> Tuple[List[np.ndarray], np.ndarray]:
     ''' Loads images and labels from the specified folder and file.'''
@@ -70,7 +72,7 @@ def create_model(model_name: str):
     Returns:
         model (object): Model of the specified name.
     '''
-    if model_name == "LogRegr":
+    if model_name == "LogisticRegressionModel":
         model = LogisticRegressionModel(
             epochs=100,
             metrics={
@@ -79,9 +81,9 @@ def create_model(model_name: str):
                 "roc_auc": (roc_auc_score, "predict_proba"),
             },
         )
-    elif model_name == "KNN":
+    elif model_name == "KNNModel":
         model = None
-    elif model_name == "DecisionTree":
+    elif model_name == "DecisionTreeModel":
         model = None
     else:
         raise ValueError(
@@ -116,7 +118,7 @@ def save_confusion_matrix(tp, fp, tn, fn, filename="confusion_matrix.png"):
     plt.close()
 
 def perform_training_and_evaluation(
-    model: BaseModel,
+    model_name: str,
     validation_strategy: str,
     X_train: np.ndarray,
     y_train: np.ndarray,
@@ -125,8 +127,6 @@ def perform_training_and_evaluation(
     scores_path: str = "scores/part2.json",
 ):
     os.makedirs("/".join(scores_path.split("/")[:-1]), exist_ok=True)
-    
-    model_name = model.__class__.__name__
 
     if os.path.exists(scores_path):
         try:
@@ -141,7 +141,8 @@ def perform_training_and_evaluation(
     scores[model_name][validation_strategy] = dict()
 
     if validation_strategy == "simple_split":
-        X_train, X_val, y_train, y_val = validation_split(X_train, y_train, test_size=0.2, seed=42)
+        model = create_model(model_name)
+        X_train, X_val, y_train, y_val = validation_split(X_train, y_train, test_size=0.2, seed=RANDOM_SEED)
 
         model.train(X_train, y_train, X_val, y_val)
         model.visualize_training(f"plots/part2/{model_name}/simple_split")
@@ -156,7 +157,14 @@ def perform_training_and_evaluation(
         save_confusion_matrix(tp=tp, fp=fp, tn=tn, fn=fn, filename=f"plots/part2/{model_name}/simple_split/confusion_matrix.png")
         scores[model_name][validation_strategy]["confusion_matrix"] = {"tn": tn, "fp": fp, "fn": fn, "tp": tp}
     elif validation_strategy == "k_fold":
-        pass
+        splitter = KFold(n_splits=4, random_state=RANDOM_SEED, shuffle=True)
+        
+        for i, (train_index, val_index) in enumerate(splitter.split(X_train)):
+            X_train_fold = X_train[train_index, :]
+            y_train_fold = y_train[train_index, :]
+
+            X_val_fold = X_train[val_index, :]
+            y_val_fold = y_train[val_index, :]
     elif validation_strategy == "stratified_k_fold":
         pass
     else:
@@ -193,12 +201,9 @@ def main(image_folder: str, label_file: str, model_name: str, test_size: float):
     # split data into train and test
     X_train, X_test, y_train, y_test = validation_split(X, y, test_size)
 
-    # create model
-    model = create_model(model_name)
-
     for validation_strategy in ["simple_split"]:
         perform_training_and_evaluation(
-            model=model,
+            model_name=model_name,
             validation_strategy=validation_strategy,
             X_train=X_train,
             y_train=y_train,
