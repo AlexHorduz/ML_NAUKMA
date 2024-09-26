@@ -1,1 +1,72 @@
-{"LogisticRegressionModel": {"simple_split": {"bce_loss": 0.6481990397280395, "accuracy": 0.8666666666666667, "roc_auc": 0.8622685185185186, "confusion_matrix": {"tn": 31, "fp": 5, "fn": 3, "tp": 21}}, "k_fold": {"bce_loss": 0.6412977529735306, "accuracy": 0.85, "roc_auc": 0.869212962962963, "confusion_matrix": {"tn": 31, "fp": 5, "fn": 4, "tp": 20}}, "stratified_k_fold": {"bce_loss": 0.6295369166891694, "accuracy": 0.85, "roc_auc": 0.8703703703703705, "confusion_matrix": {"tn": 31, "fp": 5, "fn": 4, "tp": 20}}}}
+{
+    "LogisticRegression": {
+        "simple_split": {
+            "bce_loss": 0.6481990397280395,
+            "accuracy": 0.8666666666666667,
+            "roc_auc": 0.8622685185185186,
+            "confusion_matrix": {
+                "tn": 31,
+                "fp": 5,
+                "fn": 3,
+                "tp": 21
+            }
+        },
+        "k_fold": {
+            "bce_loss": 0.6412977529735306,
+            "accuracy": 0.85,
+            "roc_auc": 0.869212962962963,
+            "confusion_matrix": {
+                "tn": 31,
+                "fp": 5,
+                "fn": 4,
+                "tp": 20
+            }
+        },
+        "stratified_k_fold": {
+            "bce_loss": 0.6295369166891694,
+            "accuracy": 0.85,
+            "roc_auc": 0.8703703703703705,
+            "confusion_matrix": {
+                "tn": 31,
+                "fp": 5,
+                "fn": 4,
+                "tp": 20
+            }
+        }
+    },
+    "KNN": {
+        "simple_split": {
+            "bce_loss": 1.994422418869657,
+            "accuracy": 0.8666666666666667,
+            "roc_auc": 0.9056712962962964,
+            "confusion_matrix": {
+                "tn": 33,
+                "fp": 3,
+                "fn": 5,
+                "tp": 19
+            }
+        },
+        "k_fold": {
+            "bce_loss": 2.0103636016721707,
+            "accuracy": 0.8666666666666667,
+            "roc_auc": 0.890625,
+            "confusion_matrix": {
+                "tn": 32,
+                "fp": 4,
+                "fn": 4,
+                "tp": 20
+            }
+        },
+        "stratified_k_fold": {
+            "bce_loss": 2.018556643388696,
+            "accuracy": 0.8666666666666667,
+            "roc_auc": 0.8888888888888888,
+            "confusion_matrix": {
+                "tn": 32,
+                "fp": 4,
+                "fn": 4,
+                "tp": 20
+            }
+        }
+    }
+}

@@ -12,8 +12,8 @@ from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
 import matplotlib.pyplot as plt
 
-from models.base_model import BaseModel
 from models.logistic_regression import LogisticRegressionModel
+from models.KNN import KNNModel
 
 LABELS_MAPPING = {
     "human": 0,
@@ -78,7 +78,7 @@ def create_model(model_name: str):
     Returns:
         model (object): Model of the specified name.
     '''
-    if model_name == "LogisticRegressionModel":
+    if model_name == "LogisticRegression":
         model = LogisticRegressionModel(
             epochs=100,
             metrics={
@@ -87,13 +87,20 @@ def create_model(model_name: str):
                 "roc_auc": (roc_auc_score, "predict_proba"),
             },
         )
-    elif model_name == "KNNModel":
-        model = None
-    elif model_name == "DecisionTreeModel":
+    elif model_name == "KNN":
+        model = KNNModel(
+            metrics={
+                "bce_loss": (log_loss, "predict_proba"),
+                "accuracy": (accuracy_score, "predict"),
+                "roc_auc": (roc_auc_score, "predict_proba"),
+            },
+            n_neighbours=4,
+        )
+    elif model_name == "DecisionTree":
         model = None
     else:
         raise ValueError(
-            f"Model name {model_name} not recognised, use one of [LogRegr, KNN, DecisionTree]"
+            f"Model name {model_name} not recognised, use one of [LogisticRegression, KNN, DecisionTree]"
         )
     return model
 
@@ -130,6 +137,11 @@ def perform_training_and_evaluation(
 ):
     os.makedirs("/".join(scores_path.split("/")[:-1]), exist_ok=True)
 
+    confusion_matrix_save_folder = f"plots/part2/{model_name}/{validation_strategy}"
+
+    if not os.path.exists(confusion_matrix_save_folder):
+        os.makedirs(confusion_matrix_save_folder, exist_ok=True)
+
     if os.path.exists(scores_path):
         try:
             with open(scores_path, "r") as f:
@@ -157,7 +169,7 @@ def perform_training_and_evaluation(
         all_preds = model.predict(X_test)
         tn, fp, fn, tp = map(int, confusion_matrix(y_test, all_preds).ravel())
 
-        save_confusion_matrix(tp=tp, fp=fp, tn=tn, fn=fn, filename=f"plots/part2/{model_name}/{validation_strategy}/confusion_matrix.png")
+        save_confusion_matrix(tp=tp, fp=fp, tn=tn, fn=fn, filename=f"{confusion_matrix_save_folder}/confusion_matrix.png")
         scores[model_name][validation_strategy]["confusion_matrix"] = {"tn": tn, "fp": fp, "fn": fn, "tp": tp}
     elif validation_strategy in ["k_fold", "stratified_k_fold"]:
         if validation_strategy == "k_fold":
@@ -199,7 +211,7 @@ def perform_training_and_evaluation(
 
         tn, fp, fn, tp = map(int, confusion_matrix(y_test, all_preds).ravel())
 
-        save_confusion_matrix(tp=tp, fp=fp, tn=tn, fn=fn, filename=f"plots/part2/{model_name}/{validation_strategy}/confusion_matrix.png")
+        save_confusion_matrix(tp=tp, fp=fp, tn=tn, fn=fn, filename=f"{confusion_matrix_save_folder}/confusion_matrix.png")
         scores[model_name][validation_strategy]["confusion_matrix"] = {"tn": tn, "fp": fp, "fn": fn, "tp": tp}
     else:
         raise ValueError(
