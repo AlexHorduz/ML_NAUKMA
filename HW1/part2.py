@@ -38,28 +38,34 @@ def load_data(image_folder: str, label_file: str) -> Tuple[List[np.ndarray], np.
     return images, labels
 
 
-def vectorize_images(images: np.ndarray):
+def vectorize_images(images_list: list[np.ndarray]):
     ''' Vectorizes images into a matrix of size (N, D), where N is the number of images, and D is the dimensionality of the image.'''
     model = MobileNetV2(weights='imagenet', include_top=False, pooling='avg')
-    for i in range(len(images)):
-        image = images[i]
+    images = []
+    for i in range(len(images_list)):
+        image = images_list[i]
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
         image = cv2.resize(image, (224, 224))  # Resize to input size
         image = np.expand_dims(image, axis=0)  # Add batch dimension
         image = preprocess_input(image)
-        images[i] = image
+        images.append(image)
     images = np.vstack(images)
     X = model.predict(images)
     return X
 
 
-def validation_split(X: np.ndarray, y: np.ndarray, test_size: float, seed: int = 42):
+def validation_split(
+        X: np.ndarray, y: np.ndarray, test_size: float, indices: List[int] = None, seed: int = 42,
+) -> Tuple[np.ndarray]:
     ''' Splits data into train and test.'''
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=seed, shuffle=True, stratify=y
-    )
-
-    return X_train, X_test, y_train, y_test
+    if indices:
+        return train_test_split(
+            X, y, indices, test_size=test_size, random_state=seed, shuffle=True, stratify=y
+        )
+    else:
+        return train_test_split(
+            X, y, test_size=test_size, random_state=seed, shuffle=True, stratify=y
+        )
 
 
 def create_model(model_name: str):
@@ -148,8 +154,8 @@ def perform_training_and_evaluation(
             metric_value = metric_func(y_test, y_pred)
             scores[model_name][validation_strategy][metric_name] = metric_value
         
-        y_pred = model.predict(X_test)
-        tn, fp, fn, tp = map(int, confusion_matrix(y_test, y_pred).ravel())
+        all_preds = model.predict(X_test)
+        tn, fp, fn, tp = map(int, confusion_matrix(y_test, all_preds).ravel())
 
         save_confusion_matrix(tp=tp, fp=fp, tn=tn, fn=fn, filename=f"plots/part2/{model_name}/{validation_strategy}/confusion_matrix.png")
         scores[model_name][validation_strategy]["confusion_matrix"] = {"tn": tn, "fp": fp, "fn": fn, "tp": tp}
@@ -203,7 +209,7 @@ def perform_training_and_evaluation(
     with open(scores_path, "w") as f:
         json.dump(scores, f)
 
-    # TODO examine all wrongly predicted images
+    return all_preds
 
 
 
@@ -217,17 +223,20 @@ def main(image_folder: str, label_file: str, model_name: str, test_size: float):
     # Create dataset of image <-> label pairs
     images, labels = load_data(image_folder, label_file)
 
-
     # preprocess images and labels
     X = vectorize_images(images)
 
     y = np.expand_dims(labels, 1)
 
     # split data into train and test
-    X_train, X_test, y_train, y_test = validation_split(X, y, test_size)
+    X_train, X_test, y_train, y_test, indices_train, indices_test = validation_split(X, y, test_size, list(range(X.shape[0])), RANDOM_SEED)
+
+    test_images = [images[i] for i in indices_test]
+
+    inverse_labels_mapping = {number: label for (label, number) in LABELS_MAPPING.items()}
 
     for validation_strategy in ["simple_split", "k_fold", "stratified_k_fold"]:
-        perform_training_and_evaluation(
+        preds = perform_training_and_evaluation(
             model_name=model_name,
             validation_strategy=validation_strategy,
             X_train=X_train,
@@ -235,6 +244,21 @@ def main(image_folder: str, label_file: str, model_name: str, test_size: float):
             X_test=X_test,
             y_test=y_test,
         )
+
+        wrongly_classified_images_folder = f"plots/part2/{model_name}/{validation_strategy}/wrongly_classified"
+        if not os.path.exists(wrongly_classified_images_folder):
+            os.makedirs(wrongly_classified_images_folder, exist_ok=True)
+
+        for ind in range(len(test_images)):
+            if preds[ind] != y_test[ind]:
+                pred_label = inverse_labels_mapping[preds[ind, 0]]
+                true_label = inverse_labels_mapping[y_test[ind, 0]]
+
+                plt.title(f"True label: {true_label}, Predicted: {pred_label}")
+                plt.imshow(cv2.cvtColor(test_images[ind], cv2.COLOR_BGR2RGB))
+                plt.axis("off")
+                plt.savefig(f"{wrongly_classified_images_folder}/image_{ind}.png")
+                plt.close()
 
 
     # Train model using different validation strategies (refere to https://scikit-learn.org/stable/modules/cross_validation.html)
