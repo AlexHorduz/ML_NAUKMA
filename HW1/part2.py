@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 
 from models.logistic_regression import LogisticRegressionModel
 from models.KNN import KNNModel
+from models.decision_tree import DecisionTreeModel
 
 LABELS_MAPPING = {
     "human": 0,
@@ -70,9 +71,9 @@ def validation_split(
 
 def create_model(model_name: str):
     ''' Creates a model of the specified name. 
-    1. Use your LinearRegression implementation,
-    2. TODO
-    3. 
+    1. LogisticRegression
+    2. KNN
+    3. DecisionTree
     Args:
         model_name (str): Name of the model to use.
     Returns:
@@ -97,7 +98,16 @@ def create_model(model_name: str):
             n_neighbours=4,
         )
     elif model_name == "DecisionTree":
-        model = None
+        model = DecisionTreeModel(
+            metrics={
+                "bce_loss": (log_loss, "predict_proba"),
+                "accuracy": (accuracy_score, "predict"),
+                "roc_auc": (roc_auc_score, "predict_proba"),
+            },
+            max_depth=8,
+            min_samples_leaf=5,
+            min_samples_split=15,
+        )
     else:
         raise ValueError(
             f"Model name {model_name} not recognised, use one of [LogisticRegression, KNN, DecisionTree]"
@@ -271,20 +281,6 @@ def main(image_folder: str, label_file: str, model_name: str, test_size: float):
                 plt.axis("off")
                 plt.savefig(f"{wrongly_classified_images_folder}/image_{ind}.png")
                 plt.close()
-
-
-    # Train model using different validation strategies (refere to https://scikit-learn.org/stable/modules/cross_validation.html)
-    # 1. Train, validation, test splits: so you need to split train into train and validation 
-    # 2. K-fold cross-validation: apply K-fold cross-validation on train data
-    # 3. Leave-one-out cross-validation: apply Leave-one-out cross-validation on train data
-
-
-
-    # Make error analysis
-    # 1. Plot the first 10 test images, and on each image plot the corresponding prediction
-    # 2. Plot the confusion matrix
-
-
 
 if __name__ == "__main__":
     main()

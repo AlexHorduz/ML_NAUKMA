@@ -68,5 +68,40 @@
                 "tp": 20
             }
         }
+    },
+    "DecisionTree": {
+        "simple_split": {
+            "bce_loss": 5.621693559850978,
+            "accuracy": 0.75,
+            "roc_auc": 0.7702546296296295,
+            "confusion_matrix": {
+                "tn": 28,
+                "fp": 8,
+                "fn": 7,
+                "tp": 17
+            }
+        },
+        "k_fold": {
+            "bce_loss": 1.614036670279941,
+            "accuracy": 0.7666666666666667,
+            "roc_auc": 0.8246527777777778,
+            "confusion_matrix": {
+                "tn": 29,
+                "fp": 7,
+                "fn": 7,
+                "tp": 17
+            }
+        },
+        "stratified_k_fold": {
+            "bce_loss": 1.1330087815668781,
+            "accuracy": 0.8,
+            "roc_auc": 0.804976851851852,
+            "confusion_matrix": {
+                "tn": 28,
+                "fp": 8,
+                "fn": 4,
+                "tp": 20
+            }
+        }
     }
 }
