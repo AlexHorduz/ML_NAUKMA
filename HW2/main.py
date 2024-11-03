@@ -4,9 +4,15 @@ import click
 import numpy as np
 from sklearn.manifold import TSNE
 from sklearn.cluster import AgglomerativeClustering, DBSCAN
+from sklearn.neighbors import NearestNeighbors
 import pandas as pd
 import cv2
-from transformers import AutoProcessor, CLIPVisionModelWithProjection
+from transformers import (
+    AutoProcessor,
+    AutoTokenizer,
+    CLIPVisionModelWithProjection,
+    CLIPTextModelWithProjection
+)
 import matplotlib.pyplot as plt
 import plotly.express as px
 
@@ -29,9 +35,9 @@ def load_data(image_folder: str, label_file: str) -> Tuple[List[np.ndarray], np.
     # load corresponding images
     images = []
     
-    # for image_path in metadata["image_name"].values:
-    #     image = cv2.imread(f"{image_folder}/{image_path}") # HxWxC in BGR format
-    #     images.append(image)
+    for image_path in metadata["image_name"].values:
+        image = cv2.imread(f"{image_folder}/{image_path}") # HxWxC in BGR format
+        images.append(image)
 
     return images, labels, descriptions
 
@@ -109,13 +115,12 @@ class KMeans:
         return np.sqrt(np.sum(np.power(a - b, 2), axis=1))
 
 
-def vectorize(images_list: List[np.ndarray]) -> np.ndarray:
+def vectorize_images(images_list: List[np.ndarray]) -> np.ndarray:
     return np.load("vectorized_images.npy")
     # model = CLIPVisionModelWithProjection.from_pretrained("openai/clip-vit-base-patch32")
     # processor = AutoProcessor.from_pretrained("openai/clip-vit-base-patch32")
-    # images = []
+    # embeddings = []
     # for i in range(len(images_list)):
-    #     # print(i)
     #     image = images_list[i]
     #     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
     #     image = np.expand_dims(image, axis=0)  # Add batch dimension
@@ -123,10 +128,24 @@ def vectorize(images_list: List[np.ndarray]) -> np.ndarray:
     #     inputs = processor(images=image, return_tensors="pt")
     #     outputs = model(**inputs)
     #     image_embeds = outputs.image_embeds.detach().cpu().numpy()
-    #     images.append(image_embeds)
-    # images = np.vstack(images)
-    # np.save("vectorized_images.npy", images)
-    # return images
+    #     embeddings.append(image_embeds)
+    # embeddings = np.vstack(embeddings)
+    # np.save("vectorized_images.npy", embeddings)
+    # return embeddings
+
+def vectorize_text(descriptions: List[str]) -> np.ndarray:
+    return np.load("vectorized_descriptions.npy")
+
+    # model = CLIPTextModelWithProjection.from_pretrained("openai/clip-vit-base-patch32")
+    # tokenizer = AutoTokenizer.from_pretrained("openai/clip-vit-base-patch32")
+    
+    # inputs = tokenizer(descriptions, padding=True, return_tensors="pt")
+    # outputs = model(**inputs)
+    # embeddings = outputs.text_embeds.detach().cpu().numpy()
+
+    # np.save("vectorized_descriptions.npy", embeddings)
+    # return embeddings
+
 
 def visualize_drv_images(
     drv_images: np.ndarray,
@@ -191,7 +210,7 @@ def main(images_folder, labels_path, n_components, n_clusters):
     images, labels, descriptions = load_data(images_folder, labels_path)
 
     # vectorize images and text labels
-    vImages = vectorize(images)
+    vImages = vectorize_images(images)
     
     # PCA or t-SNE on images
     
@@ -243,14 +262,40 @@ def main(images_folder, labels_path, n_components, n_clusters):
 
 
     # Select few text descriptions and select nearest neighbors based on embeddings. 
-    vText = vectorize(descriptions)
+    vText = vectorize_text(descriptions.tolist())
     drvText = dimred.transform(vText)
-    # TODO 
+    drvText = np.real(drvText)
 
-    # Plot the results: text description, few nearest images
-    # TODO
+    np.random.seed(RANDOM_SEED)
+    chosen_samples = np.random.choice(drvText.shape[0], 5, replace=False)
 
+    N_NEIGHBORS = 5
 
+    nbrs = NearestNeighbors(n_neighbors=N_NEIGHBORS + 1)  # +1 because the sample itself will be included
+    nbrs.fit(drvText)
+
+    for ind in chosen_samples:
+        distances, indices = nbrs.kneighbors(drvText[ind].reshape(1, -1))
+        
+        fig, axes = plt.subplots(1, N_NEIGHBORS + 1, figsize=(15, 5))
+
+        original_image = images[ind]
+        original_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB)
+        axes[0].imshow(original_image)
+        axes[0].set_title("Original Image")
+        axes[0].axis("off")
+        
+        for i in range(1, N_NEIGHBORS + 1):
+            neighbor_image = images[indices[0][i]]
+            neighbor_image = cv2.cvtColor(neighbor_image, cv2.COLOR_BGR2RGB)
+            
+            axes[i].imshow(neighbor_image)
+            axes[i].set_title(f"Neighbor {i}")
+            axes[i].axis("off")
+        
+        plt.tight_layout()
+        plt.savefig(f"plots/neighbours/sample_{ind}.png", dpi=300)
+        plt.close(fig)
     
 
 if __name__ == "__main__":
