@@ -191,14 +191,6 @@ def visualize_drv_images(
     else:
         print("The number of components > 3 is not supported yet")
 
-def neighbour_search(
-        text_req: np.ndarray, 
-        vImages: np.ndarray, 
-        top_k: int = 5
-    ) -> np.ndarray:
-    ''' search for top_k nearest neightbours in the space '''
-    pass
-
 
 @click.command()
 @click.option('--images_folder', type=str, help='Path to the input data')
