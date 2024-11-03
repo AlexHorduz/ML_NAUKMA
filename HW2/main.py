@@ -227,12 +227,19 @@ def main(images_folder, labels_path, n_components, n_clusters):
         algorithm_name="PCA",
         title="Agglomerative clustering algorithm trained on 3 PCA components"
     )
-    return 0
-    # DBSCAN outlier detection
-    clusterer = DBSCAN(eps=None)  # select good eps value !!!
 
-    # Create a copy of your trained data with cleaned outliers 
-    # TODO
+    # DBSCAN outlier detection
+    EPSILON = 0.8
+    clusterer = DBSCAN(eps=EPSILON)
+    cluster_labels = clusterer.fit_predict(np.real(drvImages))
+
+    visualize_drv_images(
+        drv_images=drvImages,
+        labels=cluster_labels,
+        plot_name=f"DBSCAN_with_epsilon_{EPSILON}",
+        algorithm_name="PCA",
+        title="DBSCAN trained on 3 PCA components"
+    )
 
 
     # Select few text descriptions and select nearest neighbors based on embeddings. 
