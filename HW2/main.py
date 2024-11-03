@@ -6,6 +6,10 @@ from sklearn.manifold import TSNE
 from sklearn.cluster import AgglomerativeClustering, DBSCAN
 import pandas as pd
 import cv2
+from transformers import AutoProcessor, CLIPVisionModelWithProjection
+import matplotlib.pyplot as plt
+import plotly.express as px
+
 
 
 LABELS_MAPPING = {
@@ -25,9 +29,9 @@ def load_data(image_folder: str, label_file: str) -> Tuple[List[np.ndarray], np.
     # load corresponding images
     images = []
     
-    for image_path in metadata["image_name"].values:
-        image = cv2.imread(f"{image_folder}/{image_path}") # HxWxC in BGR format
-        images.append(image)
+    # for image_path in metadata["image_name"].values:
+    #     image = cv2.imread(f"{image_folder}/{image_path}") # HxWxC in BGR format
+    #     images.append(image)
 
     return images, labels, descriptions
 
@@ -108,9 +112,68 @@ class KMeans:
         return np.sqrt(np.sum(np.power(a - b, 2)))
 
 
-def vectorize(images: np.ndarray) -> np.ndarray:
-    pass
+def vectorize(images_list: List[np.ndarray]) -> np.ndarray:
+    return np.load("vectorized_images.npy")
+    # model = CLIPVisionModelWithProjection.from_pretrained("openai/clip-vit-base-patch32")
+    # processor = AutoProcessor.from_pretrained("openai/clip-vit-base-patch32")
+    # images = []
+    # for i in range(len(images_list)):
+    #     # print(i)
+    #     image = images_list[i]
+    #     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
+    #     image = np.expand_dims(image, axis=0)  # Add batch dimension
+        
+    #     inputs = processor(images=image, return_tensors="pt")
+    #     outputs = model(**inputs)
+    #     image_embeds = outputs.image_embeds.detach().cpu().numpy()
+    #     images.append(image_embeds)
+    # images = np.vstack(images)
+    # np.save("vectorized_images.npy", images)
+    # return images
 
+def visualize_drv_images(
+    drv_images: np.ndarray,
+    labels: np.ndarray,
+    plot_name: str = None,
+    algorithm_name: str = "PCA",
+    title: str = None,
+) -> None:
+    if np.iscomplexobj(drv_images):
+        drv_images = np.real(drv_images.copy())
+    
+    if drv_images.shape[1] == 2:
+        plt.figure(figsize=(10, 6))
+        scatter = plt.scatter(drv_images[:, 0], drv_images[:, 1], c=labels, cmap="viridis", alpha=0.7)
+        plt.colorbar(scatter, label='Label')
+        plt.xlabel(f"{algorithm_name} Component 1")
+        plt.ylabel(f"{algorithm_name} Component 2")
+        if title:
+            plt.title(title)
+
+        plt.savefig(f"plots/{plot_name}_plot.png", dpi=300)
+        plt.close()
+    elif drv_images.shape[1] == 3:
+        fig = px.scatter_3d(
+            x=drv_images[:, 0],
+            y=drv_images[:, 1],
+            z=drv_images[:, 2],
+            color=labels,
+            labels={'color': 'Label'},
+            title=title if title else f"{algorithm_name} 3D Plot",
+            color_continuous_scale='viridis'
+        )
+        
+        fig.update_layout(
+            scene=dict(
+                xaxis_title=f"{algorithm_name} Component 1",
+                yaxis_title=f"{algorithm_name} Component 2",
+                zaxis_title=f"{algorithm_name} Component 3"
+            )
+        )
+
+        fig.write_html(f"plots/{plot_name}_plot.html")
+    else:
+        print("The number of components > 3 is not supported yet")
 
 def neighbour_search(
         text_req: np.ndarray, 
@@ -130,12 +193,10 @@ def main(images_folder, labels_path, n_components, n_clusters):
     # load image data and text labels
     images, labels, descriptions = load_data(images_folder, labels_path)
 
-    print(len(images), images[0].shape, labels.shape, descriptions.shape)
-    print(descriptions.dtype, descriptions[:3])
-    raise Exception
     # vectorize images and text labels
     vImages = vectorize(images)
-
+    print(vImages.shape)
+    
     # PCA or t-SNE on images
     # dimred = TSNE(n_components=n_components)
     dimred = PCA(n_components=n_components)
@@ -143,10 +204,18 @@ def main(images_folder, labels_path, n_components, n_clusters):
 
     drvImages = dimred.transform(vImages)
 
-    # Visualize 2D and 3D embeddings of images and color points based on labels
-    # TODO
+    print(drvImages.shape)
 
-    raise Exception
+    # Visualize 2D and 3D embeddings of images and color points based on labels
+    visualize_drv_images(
+        drv_images=drvImages,
+        labels=labels,
+        plot_name=f"PCA_labels_{n_components}_components",
+        algorithm_name="PCA",
+        title="Human is 0, animal is 1"
+    )
+
+    return 0
     # Perform clustering on the embeddings and visualize the results
     # clustere = AgglomerativeClustering(n_clusters=n_clusters)
     clusterer = KMeans(n_clusters=n_clusters)
