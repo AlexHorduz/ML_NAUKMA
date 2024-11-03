@@ -80,36 +80,33 @@ class PCA:
 
 
 class KMeans:
-    def __init__(self, n_clusters: int, max_iterations: int):
+    def __init__(self, n_clusters: int, max_iterations: int = 100):
         self.n_clusters = n_clusters
         self.max_iter = max_iterations
-
-        # randomly initialize cluster centroids
         self.centroids = None
 
-    def fit(self, X: np.ndarray) -> None:
+    def fit(self, X: np.ndarray, seed: int = None) -> None:
+        np.random.seed(seed=seed)
+        self.centroids = X[np.random.choice(X.shape[0], self.n_clusters, replace=False)]
         for _ in range(self.max_iter):
-            # create clusters by assigning the samples to the nearest centroids
             clusters = self.assign_clusters(self.centroids, X)
-            # update centroids
             new_centroids = self.compute_means(clusters, X)
-
+            if np.all(self.centroids == new_centroids):
+                break
+            self.centroids = new_centroids
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        # for each sample search for nearest centroids
-        pass
+        return self.assign_clusters(self.centroids, X)
 
     def assign_clusters(self, centroids: np.ndarray, X: np.ndarray) -> np.ndarray:
-        ''' given input data X and cluster centroids assign clusters to samples '''
-        pass
+        distances = np.array([self.euclidean_distance(x, centroids) for x in X])
+        return np.argmin(distances, axis=1)
 
     def compute_means(self, clusters: np.ndarray, X: np.ndarray) -> np.ndarray:
-        ''' recompute cluster centroids'''
-        pass
+        return np.array([X[clusters == k].mean(axis=0) for k in range(self.n_clusters)])
 
     def euclidean_distance(self, a, b) -> float:
-        """ Calculates the euclidean distance between two vectors a and b """
-        return np.sqrt(np.sum(np.power(a - b, 2)))
+        return np.sqrt(np.sum(np.power(a - b, 2), axis=1))
 
 
 def vectorize(images_list: List[np.ndarray]) -> np.ndarray:
@@ -195,16 +192,15 @@ def main(images_folder, labels_path, n_components, n_clusters):
 
     # vectorize images and text labels
     vImages = vectorize(images)
-    print(vImages.shape)
     
     # PCA or t-SNE on images
-    # dimred = TSNE(n_components=n_components)
+    
     dimred = PCA(n_components=n_components)
     dimred.fit(vImages)
-
     drvImages = dimred.transform(vImages)
-
-    print(drvImages.shape)
+    
+    # dimred = TSNE(n_components=n_components)
+    # drvImages = dimred.fit_transform(vImages)
 
     # Visualize 2D and 3D embeddings of images and color points based on labels
     visualize_drv_images(
@@ -215,14 +211,23 @@ def main(images_folder, labels_path, n_components, n_clusters):
         title="Human is 0, animal is 1"
     )
 
-    return 0
     # Perform clustering on the embeddings and visualize the results
-    # clustere = AgglomerativeClustering(n_clusters=n_clusters)
-    clusterer = KMeans(n_clusters=n_clusters)
+    clusterer = AgglomerativeClustering(n_clusters=n_clusters)
+    cluster_labels = clusterer.fit_predict(np.real(drvImages))
+
+    # clusterer = KMeans(n_clusters=n_clusters)
+    # clusterer.fit(vImages, seed=RANDOM_SEED)
+    # cluster_labels = clusterer.predict(vImages)
 
     # Visualize 2D and 3D embeddings of images and color points based on cluster label and original labels
-    # TODO
-
+    visualize_drv_images(
+        drv_images=drvImages,
+        labels=cluster_labels,
+        plot_name=f"agg_clustering_on_3_PCA_components_{n_clusters}_clusters",
+        algorithm_name="PCA",
+        title="Agglomerative clustering algorithm trained on 3 PCA components"
+    )
+    return 0
     # DBSCAN outlier detection
     clusterer = DBSCAN(eps=None)  # select good eps value !!!
 
