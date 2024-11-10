@@ -91,21 +91,22 @@ class CrossAttention(nn.Module):
             if module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
     
-    def forward(self, x_query, x_key_value):
+    def forward(self, q, k, v):
         """
         Args:
-        x_query: Tensor of shape (batch_size, seq_len_q, embed_dim) - Queries from the decoder
-        x_key_value: Tensor of shape (batch_size, seq_len_kv, embed_dim) - Keys and values from the encoder
+        q: Tensor of shape (batch_size, seq_len_q, embed_dim) - Queries from the decoder
+        k: Tensor of shape (batch_size, seq_len_kv, embed_dim) - Keys from the encoder
+        v: Tensor of shape (batch_size, seq_len_kv, embed_dim) - Values from the encoder
         
         Returns:
         out: Tensor of shape (batch_size, seq_len_q, embed_dim) - Cross-attention output
         """
-        b_q, t_q, _ = x_query.shape
-        b_kv, t_kv, _ = x_key_value.shape
+        b_q, t_q, _ = q.shape
+        b_kv, t_kv, _ = k.shape
         
-        q = self.q_proj(x_query)  # (batch_size, seq_len_q, embed_dim)
-        k = self.k_proj(x_key_value)  # (batch_size, seq_len_kv, embed_dim)
-        v = self.v_proj(x_key_value)  # (batch_size, seq_len_kv, embed_dim)
+        q = self.q_proj(q)  # (batch_size, seq_len_q, embed_dim)
+        k = self.k_proj(k)  # (batch_size, seq_len_kv, embed_dim)
+        v = self.v_proj(v)  # (batch_size, seq_len_kv, embed_dim)
         
         q = q.view(b_q, t_q, self.n_heads, self.head_size).transpose(1, 2)  # (batch_size, n_heads, seq_len_q, head_size)
         k = k.view(b_kv, t_kv, self.n_heads, self.head_size).transpose(1, 2)  # (batch_size, n_heads, seq_len_kv, head_size)
@@ -121,7 +122,7 @@ class CrossAttention(nn.Module):
         
         attn_output = attn_output.transpose(1, 2).contiguous().view(b_q, t_q, self.embed_dim)
         
-        out = self.proj(attn_output)
+        out = self.proj(attn_output)        
         out = self.resid_dropout(out)
         
         return out
