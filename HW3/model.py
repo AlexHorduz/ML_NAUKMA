@@ -286,10 +286,11 @@ class CaptioningModel(nn.Module):
             input_ids = self.transformer.h[i](input_ids, image)
         
         input_ids = self.transformer.ln_f(input_ids)
+
+        lm_logits = self.lm_head(input_ids)
         
         if labels is not None:
             # Calculate loss
-            lm_logits = self.lm_head(input_ids)
             loss = F.cross_entropy(lm_logits.view(-1, self.config.vocab_size), labels.view(-1))
             return loss
         
